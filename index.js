@@ -1,14 +1,20 @@
-// server.js
 const express = require("express");
 const nodemailer = require("nodemailer");
 const { MongoClient } = require("mongodb");
+const cors = require("cors");
+require("dotenv").config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const MONGODB_URI = process.env.MONGODB_URI;
+const EMAIL_USER = process.env.EMAIL_USER;
+const EMAIL_PASS = process.env.EMAIL_PASS;
+
+app.use(cors());
+app.use(express.json());
 
 // MongoDB connection
-const uri = "mongodb://localhost:27017";
-const client = new MongoClient(uri);
+const client = new MongoClient(MONGODB_URI);
 
 async function connectToMongo() {
   try {
@@ -16,38 +22,55 @@ async function connectToMongo() {
     console.log("Connected to MongoDB");
   } catch (error) {
     console.error("Error connecting to MongoDB:", error);
+    process.exit(1);
   }
 }
 connectToMongo();
 
 // Nodemailer transporter setup
 const transporter = nodemailer.createTransport({
-  // Setup your mail server configuration here
-  service: "Gmail",
+  service: "gmail",
   auth: {
-    user: "your_email@gmail.com",
-    pass: "your_password",
+    user: EMAIL_USER,
+    pass: EMAIL_PASS,
   },
 });
 
-// Express route to handle form submission
-app.use(express.json());
+// Function to send email
+async function sendEmail(options) {
+  try {
+    await transporter.sendMail(options);
+    console.log("Email sent successfully");
+  } catch (error) {
+    console.error("Error sending email:", error);
+  }
+}
 
+// Express route to handle form submission
 app.post("/submit-form", async (req, res) => {
   try {
     // Save form data to MongoDB
-    const db = client.db("your_database");
-    const formDataCollection = db.collection("form_data");
+    const db = client.db("massage");
+    const formDataCollection = db.collection("mail");
     const result = await formDataCollection.insertOne(req.body);
 
     // Send email to owner
-    const mailOptions = {
-      from: "your_email@gmail.com",
-      to: "owner_email@example.com", // Owner's email address
+    const ownerMailOptions = {
+      from: EMAIL_USER,
+      to: "owner_email@example.com",
       subject: "New form submission",
       text: JSON.stringify(req.body),
     };
-    await transporter.sendMail(mailOptions);
+    await sendEmail(ownerMailOptions);
+
+    // Send email confirmation to user
+    const userMailOptions = {
+      from: EMAIL_USER,
+      to: req.body.email,
+      subject: "Thank you for your message",
+      text: `Dear ${req.body.name},\n\nThank you for contacting us. We have received your message and will get back to you as soon as possible.\n\nBest regards,\nThe Team`,
+    };
+    await sendEmail(userMailOptions);
 
     res.status(200).send("Form submitted successfully");
   } catch (error) {
@@ -56,6 +79,11 @@ app.post("/submit-form", async (req, res) => {
   }
 });
 
+// Define a default route for the root path
+app.get("/", (req, res) => {
+  res.send("Massage sent successfully!");
+});
+
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server is running on ${PORT}`);
 });
