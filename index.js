@@ -1,5 +1,6 @@
 const express = require("express");
 const nodemailer = require("nodemailer");
+
 const { MongoClient } = require("mongodb");
 const cors = require("cors");
 require("dotenv").config();
@@ -29,7 +30,9 @@ connectToMongo();
 
 // Nodemailer transporter setup
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  service: "Gmail",
+  port: process.env.SMTP_PORT,
+  secure: false,
   auth: {
     user: EMAIL_USER,
     pass: EMAIL_PASS,
@@ -48,6 +51,8 @@ async function sendEmail(options) {
 
 // Express route to handle form submission
 app.post("/submit-form", async (req, res) => {
+  const { email,name, subject, message } = req.body;
+  console.log(email,name, subject, message);
   try {
     // Save form data to MongoDB
     const db = client.db("massage");
@@ -57,8 +62,8 @@ app.post("/submit-form", async (req, res) => {
     // Send email to owner
     const ownerMailOptions = {
       from: EMAIL_USER,
-      to: "owner_email@example.com",
-      subject: "New form submission",
+      to: email,
+      subject: subject,
       text: JSON.stringify(req.body),
     };
     await sendEmail(ownerMailOptions);
@@ -66,9 +71,9 @@ app.post("/submit-form", async (req, res) => {
     // Send email confirmation to user
     const userMailOptions = {
       from: EMAIL_USER,
-      to: req.body.email,
-      subject: "Thank you for your message",
-      text: `Dear ${req.body.name},\n\nThank you for contacting us. We have received your message and will get back to you as soon as possible.\n\nBest regards,\nThe Team`,
+      to: email,
+      subject: "Thank you for contact",
+      text: `Dear ${name},\n\nThank you for contacting us. We have received your message and will get back to you as soon as possible.\n\nBest regards,\nshahsultan islam joy,\n\n +8801726606815(whatsapp),`,
     };
     await sendEmail(userMailOptions);
 
